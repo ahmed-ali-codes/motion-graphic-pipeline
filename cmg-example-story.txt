@@ -1,0 +1,355 @@
+EXAMPLE STORY MODULES (39 s AI-coding-agents video). Use only as a quality/format example.
+
+----- FILE: style.js -----
+// ---------- the timeline: picture and sound both read these ----------
+const TL = {
+  D: 39,
+  hook:  { w1: [0.15, 0.36, 0.57], w2: [0.82, 1.04], safe: 1.84, under: 2.12 },
+  adopt: { head: [3.85, 4.05], panel: 4.3, bar1: 4.45, v1: 4.8, cnt: [5.3, 6.4], lock: 6.4, ring: 6.7, chip1: 7.2, chip2: 8.0, src: 4.3 },
+  auto:  { big: 9.5, w: [9.95, 10.15, 10.35], w2: [10.75, 10.9, 11.05], serif: 11.5, under: 11.85, src: 11.2, ring: 12.25, chip: 12.6 },
+  test:  { w: [13.9, 14.2, 14.55, 14.75], mock: 13.85, lines: [14.45, 14.8, 15.15], func: 16.0, atk: 16.8, tag: 17.6, src: 18.1 },
+  func:  { up: 19.6, cnt: [19.8, 21.3], lock: 21.3, w: [21.6, 21.8, 22.0, 22.2], sub: 22.6 },
+  sec:   { w: [23.5, 23.7, 23.95], cnt: [24.7, 26.0], lock: 26.0, best: 26.5, others: 27.1 },
+  code:  { w: [28.85, 29.05], cardA: 29.4, cardB: 29.85, label: 30.3, strike: 31.0, ring: 31.6, line: 32.2, arrow: 32.5 },
+  take:  { ver: 34.2, hl: 34.45, w: [34.75, 34.95, 35.15], line: 36.2, src: 37.0 },
+};
+// cuts between scenes: [start, duration, type]
+const CUTS = [
+  { t: 3.5, d: 0.28, type: 'whip', dir: 1 },
+  { t: 9.3, d: 0.22, type: 'glitch' },
+  { t: 13.55, d: 0.26, type: 'whipV', dir: 1 },
+  { t: 19.3, d: 0.2, type: 'glitch' },
+  { t: 23.35, d: 0.14, type: 'flash' },
+  { t: 28.5, d: 0.25, type: 'whip', dir: -1 },
+  { t: 33.9, d: 0.22, type: 'glitch' },
+];
+// camera kicks: punch zoom and shake
+const PUNCH = [
+  { t: 0.15, a: 0.025 }, { t: 0.36, a: 0.025 }, { t: 0.57, a: 0.03 }, { t: 0.82, a: 0.045 }, { t: 1.04, a: 0.075 }, { t: 1.84, a: 0.12 },
+  { t: 3.85, a: 0.03 }, { t: 4.05, a: 0.03 }, { t: 6.4, a: 0.07 },
+  { t: 9.5, a: 0.1 }, { t: 10.35, a: 0.04 }, { t: 11.05, a: 0.04 }, { t: 11.5, a: 0.05 },
+  { t: 13.9, a: 0.03 }, { t: 14.55, a: 0.03 }, { t: 16.8, a: 0.06 },
+  { t: 21.3, a: 0.06 }, { t: 23.95, a: 0.05 }, { t: 26.0, a: 0.14, k: 1.6 },
+  { t: 28.85, a: 0.03 }, { t: 29.85, a: 0.04 }, { t: 34.2, a: 0.1 }, { t: 35.15, a: 0.06 },
+];
+const SHAKE = [{ t: 1.84, a: 13 }, { t: 6.4, a: 6 }, { t: 9.5, a: 8 }, { t: 16.8, a: 10 }, { t: 21.3, a: 6 }, { t: 26.0, a: 18, k: 6 }, { t: 34.2, a: 12 }];
+const FLASH = [{ t: 1.84, a: 0.22 }, { t: 6.4, a: 0.12 }, { t: 16.8, a: 0.2, col: '255,59,48' }, { t: 21.3, a: 0.1 }, { t: 26.0, a: 0.55 }, { t: 34.2, a: 0.25 }];
+const LEAK = [1.84, 26.0, 34.2];
+
+// shared value curves (picture and sound)
+const dailyVal = (t) => 14 + 23 * ez.out3(span(t, TL.adopt.cnt[0], TL.adopt.cnt[1]));
+const dailyShown = (t) => Math.round(dailyVal(t));
+const funcShown = (t) => Math.round(913 * ez.out3(span(t, TL.func.cnt[0], TL.func.cnt[1]))) / 10;
+const secShown = (t) => Math.round(251 * ez.out3(span(t, TL.sec.cnt[0], TL.sec.cnt[1]))) / 10;
+const redRoom = (t) => Math.max(span(t, 16.7, 17.0) * (1 - span(t, 18.9, 19.2)), span(t, 26.0, 26.3) * (1 - span(t, 28.2, 28.5)));
+const mono = (px) => `600 ${px}px ui-monospace, Menlo, Consolas, "DejaVu Sans Mono", monospace`;
+----- END FILE: style.js -----
+
+----- FILE: scenes.js -----
+// ---------- small shared helpers for this story ----------
+function txt(c, s, x, y, font, color, align = 'left', a = 1) { c.save(); c.globalAlpha = a; c.font = font; c.fillStyle = color; c.textAlign = align; c.textBaseline = 'middle'; c.fillText(s, x, y); c.restore(); }
+const fadeUp = (t, t0, d = 0.35) => ez.out3(span(t, t0, t0 + d));
+// a pill with mixed-style text segments, pops with overshoot
+function chip(c, segs, x, y, p, o = {}) {
+  if (p <= 0) return;
+  c.save(); let tot = 0;
+  segs.forEach((g) => { c.font = g.font; c.letterSpacing = '0px'; g.w = c.measureText(g.s).width; tot += g.w; });
+  const padX = 28, h = o.h || 76, w = tot + padX * 2, s = ez.back(clamp(p), 2), left = o.align === 'left' ? x : x - w / 2;
+  c.translate(left + w / 2, y + (1 - s) * 34); c.scale(s, s); c.globalAlpha = Math.min(1, s * 2);
+  c.fillStyle = C.panel; rr(c, -w / 2, -h / 2, w, h, 18); c.fill();
+  c.lineWidth = 1.5; c.strokeStyle = o.line || C.line; rr(c, -w / 2, -h / 2, w, h, 18); c.stroke();
+  let cx = -w / 2 + padX; c.textBaseline = 'middle'; c.textAlign = 'left';
+  segs.forEach((g) => { c.font = g.font; c.fillStyle = g.color || C.ink; if (g.glow) { c.shadowColor = g.glow; c.shadowBlur = 24; } c.fillText(g.s, cx, 2); c.shadowBlur = 0; cx += g.w; });
+  c.restore();
+}
+function mark(c, x, y, ok, col, s = 13) {
+  c.save(); c.strokeStyle = col; c.lineWidth = 5; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath();
+  if (ok) { c.moveTo(x - s * 0.8, y); c.lineTo(x - s * 0.2, y + s * 0.6); c.lineTo(x + s * 0.9, y - s * 0.6); }
+  else { c.moveTo(x - s * 0.7, y - s * 0.7); c.lineTo(x + s * 0.7, y + s * 0.7); c.moveTo(x + s * 0.7, y - s * 0.7); c.lineTo(x - s * 0.7, y + s * 0.7); }
+  c.stroke(); c.restore();
+}
+
+// ---------- background, camera, chrome ----------
+function background(c, t) {
+  c.fillStyle = C.bg; c.fillRect(0, 0, W, HH);
+  const glow = (x, y, r, col) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, HH); };
+  glow(260 + Math.sin(t * 0.35) * 90, 180 + Math.cos(t * 0.27) * 40, 620, 'rgba(255,214,10,0.055)');
+  glow(1050 + Math.cos(t * 0.31) * 70, 560 + Math.sin(t * 0.22) * 50, 640, 'rgba(90,120,255,0.05)');
+  c.save(); c.strokeStyle = 'rgba(244,241,234,0.032)'; c.lineWidth = 1; c.beginPath();
+  const off = (t * 8) % 80; for (let x = -off; x < W; x += 80) { c.moveTo(x, 0); c.lineTo(x, HH); } for (let y = -off * 0.5; y < HH; y += 80) { c.moveTo(0, y); c.lineTo(W, y); } c.stroke(); c.restore();
+  const red = redRoom(t); if (red > 0) glow(640, 380, 760, `rgba(255,40,30,${0.16 * red})`);
+}
+const NX = noise1(11), NY = noise1(23), NR = noise1(37);
+const PUSH = [[0, 3.5], [3.78, 9.3], [9.52, 13.55], [13.81, 19.3], [19.5, 23.35], [23.49, 28.5], [28.75, 33.9], [34.12, 39]];
+function camera(t, si) {
+  let z = 1, dx = 0, dy = 0, rot = 0;
+  const [a, b] = PUSH[si]; z *= 1 + 0.035 * ez.inout3(span(t, a, b));
+  for (const k of PUNCH) { const d = t - k.t; if (d < 0) continue; const e = d < 0.06 ? ez.out3(d / 0.06) : Math.exp(-(d - 0.06) * (k.k || 2.6)); z += k.a * e; }
+  for (const k of SHAKE) { const d = t - k.t; if (d < 0 || d > 1.4) continue; const e = k.a * Math.exp(-d * (k.k || 8)); dx += e * NX(t * 34 + k.t * 5); dy += e * NY(t * 37 + k.t * 3); rot += e * 0.0015 * NR(t * 26 + k.t); }
+  return { z, dx, dy, rot, fx: 640, fy: 360 };
+}
+const applyCam = (c, k) => { c.translate(640 + k.dx, 360 + k.dy); c.rotate(k.rot); c.scale(k.z, k.z); c.translate(-k.fx, -k.fy); };
+
+// persistent chrome: topic label (no STEP pill: this is not a sequence)
+function chrome(c, t) {
+  const a = span(t, 3.78, 4.0) * (1 - span(t, 33.75, 33.9));
+  if (a <= 0) return;
+  c.save(); c.globalAlpha = a; c.fillStyle = C.hi; c.fillRect(64, 47, 12, 12);
+  c.font = inter(28, 700); c.letterSpacing = '3px'; c.fillStyle = C.dim; c.textBaseline = 'middle'; c.fillText('AI CODING AGENTS · 2026', 88, 54); c.restore();
+}
+
+// =================================== SCENES ===================================
+// 0 · hook
+function sceneHook(c, t) {
+  const H = TL.hook, sh = lerp(40, -60, ez.inout3(span(t, H.safe - 0.14, H.safe + 0.16)));
+  const r1 = [word('AI', H.w1[0], disp(128), C.ink, { track: '2px' }), word('CODE', H.w1[1], disp(128), C.ink, { track: '2px' }), word('PASSES', H.w1[2], disp(128), C.ink, { track: '2px' })];
+  const r2 = [word('THE', H.w2[0], disp(168), C.ink, { track: '2px' }), word('TESTS.', H.w2[1], disp(168), C.ink, { track: '2px' })];
+  row(c, r1, 640, 215 + sh, 32); row(c, r2, 640, 375 + sh, 36);
+  r1.forEach((it) => slam(c, it, t)); r2.forEach((it) => slam(c, it, t, { from: 1.6 }));
+  if (t >= H.safe) {
+    const r3 = [word('but is it safe?', H.safe, serif(164), C.hi, { base: 'alphabetic' })]; row(c, r3, 640, 590, 0);
+    slam(c, r3[0], t, { from: 1.7, glow: 'rgba(255,214,10,0.35)' });
+    const p = span(t, H.under, H.under + 0.22);
+    if (p > 0) { const x0 = r3[0].x - 6, x1 = r3[0].x + r3[0].w + 8; c.save(); c.strokeStyle = C.hi; c.lineWidth = 9; c.lineCap = 'round'; c.beginPath(); const n = 24; for (let i = 0; i <= n * p; i++) { const u = i / n, x = lerp(x0, x1, u), y = 626 + Math.sin(u * 3.2) * 5 - u * 6; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); c.restore(); }
+  }
+}
+// 1 · adoption: daily agent use 14% -> 37%
+function sceneAdopt(c, t) {
+  const A = TL.adopt;
+  const l1 = [word('DAILY', A.head[0], disp(124))], l2 = [word('AGENT', A.head[1], disp(124)), word('USE', A.head[1] + 0.1, disp(124))];
+  row(c, l1, 72, 225, 0, 'left'); row(c, l2, 72, 358, 24, 'left');
+  l1.forEach((it) => slam(c, it, t)); l2.forEach((it) => slam(c, it, t));
+  { const u = fadeUp(t, A.head[1] + 0.35); if (u > 0) txt(c, 'of developers, at work', 76, 448 + (1 - u) * 14, inter(32, 600), C.dim, 'left', u); }
+  chip(c, [{ s: '59%', font: inter(34, 800), color: C.money, glow: 'rgba(61,255,143,0.5)' }, { s: ' use agents at work', font: inter(32, 600) }], 72, 545, span(t, A.chip1, A.chip1 + 0.32), { align: 'left' });
+  chip(c, [{ s: '31%', font: inter(34, 800), color: C.dim }, { s: ' in the 2025 survey', font: inter(32, 600), color: C.dim }], 72, 635, span(t, A.chip2, A.chip2 + 0.32), { align: 'left' });
+  const pp = span(t, A.panel, A.panel + 0.4), K = 8.4, base = 175;
+  const val2 = t < A.cnt[0] ? 14 * ez.out3(span(t, A.cnt[0] - 0.3, A.cnt[0])) : dailyVal(t);
+  if (pp > 0) {
+    const s = ez.back(pp, 1.6); c.save(); c.translate(890, 385); c.scale(s, s); c.globalAlpha = Math.min(1, pp * 2.5);
+    c.fillStyle = C.panel; rr(c, -330, -255, 660, 510, 24); c.fill(); c.strokeStyle = C.line; c.lineWidth = 1.5; rr(c, -330, -255, 660, 510, 24); c.stroke();
+    c.strokeStyle = '#2b2b31'; c.lineWidth = 2; c.beginPath(); c.moveTo(-290, base); c.lineTo(290, base); c.stroke();
+    // 2025 bar
+    const h1 = 14 * K * ez.out3(span(t, A.bar1, A.bar1 + 0.3));
+    if (h1 > 0) { c.fillStyle = '#55555d'; rr(c, -235, base - h1, 190, h1, 8); c.fill(); }
+    if (t >= A.v1) { const u = span(t, A.v1, A.v1 + 0.2), sc = lerp(1.3, 1, ez.outExpo(u)); c.save(); c.translate(-140, base - 14 * K - 48); c.scale(sc, sc); c.globalAlpha = Math.min(1, u * 3); c.font = disp(92); c.fillStyle = C.ink; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('14%', 0, 0); c.restore(); }
+    // 2026 bar
+    const h2 = val2 * K;
+    if (h2 > 1) {
+      const lk = t > A.lock ? Math.exp(-(t - A.lock) * 2) : 0; c.save(); c.shadowColor = `rgba(61,255,143,${0.25 + 0.5 * lk})`; c.shadowBlur = 30;
+      const g = c.createLinearGradient(0, base - h2, 0, base); g.addColorStop(0, C.money); g.addColorStop(1, '#1fae62'); c.fillStyle = g; rr(c, 45, base - h2, 190, h2, 8); c.fill(); c.restore();
+      if (t >= A.cnt[0] - 0.05) {
+        const lp = t > A.lock ? span(t, A.lock, A.lock + 0.4) : 0, pop = 1 + 0.14 * Math.sin(Math.PI * lp) * (lp < 1 ? 1 : 0);
+        c.save(); c.translate(140, base - h2 - 56); c.scale(pop, pop); c.font = disp(118); c.textAlign = 'center'; c.textBaseline = 'middle'; c.shadowColor = `rgba(61,255,143,${0.45 + 0.4 * lk})`; c.shadowBlur = 44; c.fillStyle = C.money; c.fillText(dailyShown(t) + '%', 0, 0); c.shadowBlur = 0; c.fillText(dailyShown(t) + '%', 0, 0); c.restore();
+      }
+    }
+    txt(c, '2025', -140, base + 38, inter(30, 700), C.dim, 'center'); txt(c, '2026', 140, base + 38, inter(30, 700), C.ink, 'center');
+    c.restore();
+  }
+  scribble(c, 1030, 385 + base - 37 * K - 56, 160, 82, span(t, A.ring, A.ring + 0.35), C.hi, 7, 4);
+  { const u = fadeUp(t, A.src); if (u > 0) txt(c, 'Stack Overflow Pulse Survey · Apr 2026 · n=1,100', 1220, 684, inter(28, 600), C.dim, 'right', u); }
+}
+// 2 · autopilot: 63%
+function sceneAuto(c, t) {
+  const U = TL.auto;
+  const big = [word('63%', U.big, disp(190), C.ink, { track: '3px' })]; row(c, big, 640, 190, 0); slam(c, big[0], t, { from: 1.7, glow: 'rgba(244,241,234,0.25)', glowBlur: 50 });
+  scribble(c, 640, 190, 178, 100, span(t, U.ring, U.ring + 0.35), C.hi, 7, 6);
+  const r2 = [word('RARELY', U.w[0], disp(104)), word('OR', U.w[1], disp(104)), word('NEVER', U.w[2], disp(104))], r3 = [word('LET', U.w2[0], disp(104)), word('AGENTS', U.w2[1], disp(104)), word('RUN', U.w2[2], disp(104))];
+  row(c, r2, 640, 345, 26); row(c, r3, 640, 445, 26); r2.forEach((it) => slam(c, it, t)); r3.forEach((it) => slam(c, it, t));
+  if (t >= U.serif) {
+    const it = word('on autopilot.', U.serif, serif(116), C.hi, { base: 'alphabetic' }); row(c, [it], 640, 548, 0); slam(c, it, t, { from: 1.5, glow: 'rgba(255,214,10,0.3)' });
+    const p = span(t, U.under, U.under + 0.22); if (p > 0) { const x0 = it.x - 6, x1 = it.x + it.w + 8; c.save(); c.strokeStyle = C.hi; c.lineWidth = 8; c.lineCap = 'round'; c.beginPath(); const n = 24; for (let i = 0; i <= n * p; i++) { const u = i / n, x = lerp(x0, x1, u), y = 574 + Math.sin(u * 3.2) * 5 - u * 6; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); c.restore(); }
+  }
+  chip(c, [{ s: '60%', font: inter(34, 800), color: C.ink }, { s: ' block unapproved system changes', font: inter(32, 600), color: C.dim }], 640, 628, span(t, U.chip, U.chip + 0.32));
+  { const u = fadeUp(t, U.src); if (u > 0) txt(c, 'Stack Overflow Pulse Survey · Apr 2026', 640, 692, inter(28, 600), C.dim, 'center', u); }
+}
+// 3 · the experiment: a code-drawn terminal mockup (illustrative task)
+let TR = null;
+function termLayer(t) {
+  const B = TL.test; if (!TR) TR = CM.layer(780, 520); const x = TR.getContext('2d'), w = 780, h = 520;
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, w, h); x.globalAlpha = 1;
+  x.fillStyle = '#0f1013'; rr(x, 0, 0, w, h, 18); x.fill();
+  x.save(); rr(x, 0, 0, w, h, 18); x.clip();
+  x.fillStyle = '#1b1c21'; x.fillRect(0, 0, w, 52);
+  ['#ff5f57', '#febc2e', '#28c840'].forEach((col, i) => { x.fillStyle = col; x.beginPath(); x.arc(28 + i * 22, 26, 7, 0, 7); x.fill(); });
+  x.fillStyle = '#8e8d94'; x.font = inter(20, 600); x.textBaseline = 'middle'; x.fillText('task_017  ·  illustrative example', 120, 27);
+  const L = [['# TASK', '#8e8d94', B.mock + 0.2], ['Add GET /users/:id', '#f4f1ea', B.lines[0]], ['Return the user record.', '#f4f1ea', B.lines[1]], ['Security: (not mentioned)', '#8e8d94', B.lines[2]]];
+  x.font = mono(30); x.textBaseline = 'middle';
+  L.forEach(([s, col, t0], i) => { const n = Math.floor(s.length * span(t, t0, t0 + 0.32)); if (n > 0) { x.fillStyle = col; x.fillText(s.slice(0, n), 36, 118 + i * 52); } });
+  const pill = (y, t0, label, verdict, col, ok) => {
+    if (t < t0) return; const p = ez.back(span(t, t0, t0 + 0.3), 2), cy = y + 40; x.save(); x.translate(w / 2, cy); x.scale(p, p); x.globalAlpha = Math.min(1, p * 2);
+    x.fillStyle = '#1b1c21'; rr(x, -354, -40, 708, 80, 16); x.fill(); x.lineWidth = 3; x.strokeStyle = col; rr(x, -354, -40, 708, 80, 16); x.stroke();
+    mark(x, -318, 0, ok, col, 14); x.font = inter(34, 600); x.fillStyle = '#f4f1ea'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText(label, -284, 2);
+    x.font = inter(34, 800); x.fillStyle = col; x.textAlign = 'right'; x.fillText(verdict, 330, 2); x.restore();
+  };
+  pill(305, B.func, 'functional tests', 'PASS', '#f4f1ea', true);
+  pill(400, B.atk, 'attack replay', 'EXPLOITED', C.red, false);
+  x.restore(); return TR;
+}
+// draw a flat layer rotated around its vertical axis (perspective by vertical strips)
+DRAWYAW_PLACEHOLDER
+function sceneTest(c, t) {
+  const B = TL.test;
+  const r1 = [word('6 AGENTS.', B.w[0], disp(100))], r2 = [word('450', B.w[1], disp(100), C.hi), word('TASKS.', B.w[1] + 0.08, disp(100))], r3 = [word('NO SECURITY', B.w[2], disp(100))], r4 = [word('HINTS.', B.w[3], disp(100))];
+  row(c, r1, 72, 235, 0, 'left'); row(c, r2, 72, 350, 22, 'left'); row(c, r3, 72, 465, 0, 'left'); row(c, r4, 72, 580, 0, 'left');
+  [...r1, ...r2, ...r3, ...r4].forEach((it) => slam(c, it, t));
+  const enter = ez.outExpo(span(t, B.mock, B.mock + 0.65)), yaw = lerp(-0.62, -0.36, enter) + Math.sin(t * 0.9) * 0.015;
+  if (t > B.mock) drawYaw(c, termLayer(t), 900 + (1 - enter) * 520, 400 + Math.sin(t * 1.1) * 5, 660, 440, yaw, Math.min(1, enter * 1.6));
+  { const u = fadeUp(t, B.tag); if (u > 0) txt(c, 'hidden tests + live attack replay', 76, 650 + (1 - u) * 12, inter(30, 600), C.dim, 'left', u); }
+  { const u = fadeUp(t, B.src); if (u > 0) txt(c, 'Last Secure Code Benchmark · arXiv, Oct 2026', 76, 694, inter(28, 600), C.dim, 'left', u); }
+}
+// 4 · up to 91.3% pass the functional tests
+function sceneFunc(c, t) {
+  const F2 = TL.func;
+  { const u = fadeUp(t, F2.up); if (u > 0) txt(c, 'UP TO', 640, 125 + (1 - u) * 14, inter(46, 700), C.dim, 'center', u); }
+  if (t > F2.cnt[0] - 0.15) {
+    const v = funcShown(t), lk = t > F2.lock ? span(t, F2.lock, F2.lock + 0.4) : 0, pop = 1 + 0.12 * Math.sin(Math.PI * lk) * (lk < 1 ? 1 : 0);
+    c.save(); c.translate(640, 335); c.scale(pop, pop); c.globalAlpha = span(t, F2.cnt[0] - 0.15, F2.cnt[0]);
+    c.font = disp(260); c.textAlign = 'center'; c.textBaseline = 'middle'; c.letterSpacing = '4px';
+    c.shadowColor = `rgba(244,241,234,${0.22 + 0.35 * (t > F2.lock ? Math.exp(-(t - F2.lock) * 2.2) : 0)})`; c.shadowBlur = 56; c.fillStyle = C.ink; c.fillText(v.toFixed(1) + '%', 0, 0);
+    c.shadowBlur = 0; c.fillText(v.toFixed(1) + '%', 0, 0); c.restore();
+  }
+  const r = [word('PASS', F2.w[0], disp(88)), word('THE', F2.w[1], disp(88)), word('FUNCTIONAL', F2.w[2], disp(88)), word('TESTS.', F2.w[3], disp(88))]; row(c, r, 640, 535, 24); r.forEach((it) => slam(c, it, t));
+  { const u = fadeUp(t, F2.sub); if (u > 0) txt(c, '73.6% to 91.3% across six agents', 640, 628 + (1 - u) * 12, inter(32, 600), C.dim, 'center', u); }
+}
+// 5 · ...but only 25.1% are functional AND secure
+function sceneSec(c, t) {
+  const S = TL.sec;
+  const r = [word('BUT', S.w[0], disp(120)), word('ALSO', S.w[1], disp(120)), word('SECURE?', S.w[2], disp(120))]; row(c, r, 640, 178, 30); r.forEach((it) => slam(c, it, t));
+  if (t > S.cnt[0] - 0.15) {
+    const v = secShown(t), lk = t > S.lock ? span(t, S.lock, S.lock + 0.4) : 0, pop = 1 + 0.16 * Math.sin(Math.PI * lk) * (lk < 1 ? 1 : 0);
+    c.save(); c.translate(640, 410); c.scale(pop, pop); c.globalAlpha = span(t, S.cnt[0] - 0.15, S.cnt[0]);
+    c.font = disp(280); c.textAlign = 'center'; c.textBaseline = 'middle'; c.letterSpacing = '4px';
+    c.shadowColor = `rgba(255,59,48,${0.35 + 0.4 * (t > S.lock ? Math.exp(-(t - S.lock) * 2) : 0)})`; c.shadowBlur = 60; c.fillStyle = C.red; c.fillText(v.toFixed(1) + '%', 0, 0);
+    c.shadowBlur = 0; c.fillText(v.toFixed(1) + '%', 0, 0); c.restore();
+    const age = t - S.lock;
+    if (age > 0 && age < 0.9) { const rr2 = rng('spark'); c.save(); c.lineCap = 'round';
+      for (let i = 0; i < 26; i++) { const an = rr2() * Math.PI * 2, sp = rr2.in(260, 520), d0 = sp * ez.out3(Math.min(1, age / 0.6)), len = 46 * (1 - age / 0.9); c.strokeStyle = i % 3 ? `rgba(255,59,48,${1 - age / 0.9})` : `rgba(255,255,255,${1 - age / 0.9})`; c.lineWidth = 4; c.beginPath(); c.moveTo(640 + Math.cos(an) * d0, 410 + Math.sin(an) * d0 * 0.7); c.lineTo(640 + Math.cos(an) * (d0 + len), 410 + Math.sin(an) * (d0 + len) * 0.7); c.stroke(); }
+      c.restore(); }
+  }
+  if (t >= S.best) { const it = word('best of six.', S.best, serif(100), C.hi, { base: 'alphabetic' }); row(c, [it], 640, 628, 0); slam(c, it, t, { from: 1.4, glow: 'rgba(255,214,10,0.3)' }); }
+  { const u = fadeUp(t, S.others); if (u > 0) txt(c, 'the other five: 16.4% to 24.7%', 640, 686 + (1 - u) * 12, inter(32, 600), C.dim, 'center', u); }
+}
+// 6 · same feature, one line of difference (illustrative code)
+function codeCard(c, cx, cy, w, h, title, lines, foot, p, col, titleCol, dim) {
+  if (p <= 0) return; const s = ez.back(clamp(p), 1.8);
+  c.save(); c.translate(cx, cy + (1 - s) * 40); c.scale(s, s); c.globalAlpha = Math.min(1, s * 2) * (dim || 1);
+  c.fillStyle = '#101114'; rr(c, -w / 2, -h / 2, w, h, 20); c.fill(); c.lineWidth = 3; c.strokeStyle = col; rr(c, -w / 2, -h / 2, w, h, 20); c.stroke();
+  txt(c, title, -w / 2 + 28, -h / 2 + 40, inter(28, 700), titleCol, 'left');
+  c.font = mono(28); c.textBaseline = 'middle'; c.textAlign = 'left'; c.fillStyle = C.ink; lines.forEach((l, i) => c.fillText(l, -w / 2 + 28, -h / 2 + 100 + i * 44));
+  foot.forEach((f, i) => { const y = h / 2 - 85 + i * 50; mark(c, -w / 2 + 44, y, f.ok, f.col, 11); txt(c, f.s, -w / 2 + 76, y + 2, inter(28, 600), f.col, 'left'); });
+  c.restore();
+}
+function sceneCode(c, t) {
+  const K = TL.code;
+  const r = [word('SAME', K.w[0], disp(96)), word('FEATURE.', K.w[1], disp(96))]; row(c, r, 640, 135, 26); r.forEach((it) => slam(c, it, t));
+  const dimA = 1 - 0.45 * span(t, K.strike, K.strike + 0.2);
+  codeCard(c, 340, 365, 540, 330, 'STRING-BUILT QUERY', ['db.query(', '  "SELECT * FROM users', '   WHERE id=" + id)'], [{ s: 'tests pass', ok: true, col: C.ink }, { s: 'attack succeeds', ok: false, col: C.red }], span(t, K.cardA, K.cardA + 0.35), C.red, C.red, dimA);
+  codeCard(c, 940, 365, 540, 330, 'PARAMETERIZED QUERY', ['db.query(', '  "SELECT * FROM users', '   WHERE id = ?", [id])'], [{ s: 'tests pass', ok: true, col: C.ink }, { s: 'attack blocked', ok: true, col: C.ink }], span(t, K.cardB, K.cardB + 0.35), '#3b3b41', C.ink, 1);
+  strike(c, 95, 585, 325, span(t, K.strike, K.strike + 0.2), C.red, 12, 0.16);
+  { const u = fadeUp(t, K.label); if (u > 0) txt(c, 'illustrative example', 640, 578, inter(28, 600), C.dim, 'center', u); }
+  scribble(c, 940, 365, 300, 192, span(t, K.ring, K.ring + 0.38), C.hi, 7, 8);
+  { const u = fadeUp(t, K.line, 0.4); if (u > 0) txt(c, 'Both pass the test. Only one survives an attack.', 640, 662 + (1 - u) * 14, inter(34, 600), C.ink, 'center', u); }
+  handArrow(c, [1130, 622], [1170, 580], [1100, 540], span(t, K.arrow, K.arrow + 0.25), C.hi, 6);
+}
+// 7 · takeaway
+function sceneTake(c, t) {
+  const K = TL.take;
+  const v = word('VERIFY', K.ver, disp(214), C.ink, { track: '4px' }); row(c, [v], 640, 240, 0);
+  const path = swipe(c, v, t, K.hl, 0.26, { h: 0.84, pad: 24, dy: 6 }); slamMarked(c, v, t, path, { from: 1.6 });
+  const r2 = [word('BEFORE', K.w[0], disp(130)), word('YOU', K.w[1], disp(130)), word('SHIP.', K.w[2], disp(130))]; row(c, r2, 640, 420, 30); r2.forEach((it) => slam(c, it, t));
+  { const u = fadeUp(t, K.line, 0.45); if (u > 0) txt(c, 'Review the diff. Run security tests.', 640, 545 + (1 - u) * 18, inter(36, 600), C.ink, 'center', u); }
+  { const u = fadeUp(t, K.src, 0.4); if (u > 0) { txt(c, 'Sources: Stack Overflow Pulse Survey, Apr 2026', 640, 628, inter(28, 600), C.dim, 'center', u); txt(c, 'LSCBench, arXiv 2610.14766, Oct 2026', 640, 668, inter(28, 600), C.dim, 'center', u); } }
+}
+const SCENES = [sceneHook, sceneAdopt, sceneAuto, sceneTest, sceneFunc, sceneSec, sceneCode, sceneTake];
+----- END FILE: scenes.js -----
+
+----- FILE: score.js -----
+// =================================== SOUND SCORE ===================================
+function scoreSound(k) {
+  const H = TL.hook, A = TL.adopt, U = TL.auto, T = TL.test, F2 = TL.func, S = TL.sec, K = TL.code, V = TL.take;
+  const px = (x) => clamp((x / 1280) * 2 - 1, -1, 1) * 0.55;
+  // ticks only when the shown number changes, never more than 12 per second
+  const ticks = (fn, t0, t1, fb, fs, gain, pan) => { let last = -1, prev = fn(t0 - 0.01); for (let t = t0; t <= t1 + 0.01; t += 1 / 240) { const v = fn(t); if (v !== prev && t - last >= 1 / 12) { k.play('tick', t, { f: fb + v * fs, gain, pan, soft: true }); last = t; } prev = v; } };
+
+  // music: drone into the first big word, beat under the body, tape stop on the wrong idea,
+  // beat back, a gap before the biggest hit, then the beat to the end
+  k.drone(0, H.safe + 0.05, { gain: 1 });
+  k.play('riser', H.safe - 1.15, { dur: 1.15, gain: 0.9 });
+  k.music(H.safe, T.atk, { bpm: 98, gain: 1 });
+  k.music(19.4, 25.2, { bpm: 98, gain: 1 });
+  k.music(S.lock + 0.2, TL.D - 0.15, { bpm: 98, gain: 1 });
+
+  // hook
+  H.w1.forEach((t, i) => k.play('slam', t, { gain: 0.65, pan: (i - 1) * 0.25 }));
+  k.play('slam', H.w2[0], { gain: 0.85, pan: -0.15 }); k.play('slam', H.w2[1], { gain: 1.15, pan: 0.15 }); k.play('boom', H.w2[1], { gain: 0.5 });
+  k.play('boom', H.safe, { gain: 1.1 }); k.play('slam', H.safe, { gain: 0.9 }); k.play('sparkle', H.safe + 0.05, { gain: 0.8 });
+  k.play('marker', H.under, { dur: 0.22, gain: 0.8, soft: true });
+
+  // cut 0 (whip right) + adoption
+  k.play('whoosh', CUTS[0].t - 0.04, { dur: 0.36, gain: 1, dir: 1 });
+  A.head.forEach((t, i) => k.play('slam', t, { gain: 0.6, pan: -0.5 + i * 0.1 }));
+  k.play('slam', A.head[1] + 0.1, { gain: 0.5, pan: -0.4 });
+  k.play('pop', A.panel, { f: 700, gain: 0.6, pan: 0.4 });
+  k.play('whoosh', A.bar1, { dur: 0.3, gain: 0.25, dir: -1, top: 1600, soft: true });
+  k.play('slam', A.v1, { gain: 0.5, pan: 0.2 });
+  ticks(dailyShown, A.cnt[0], A.cnt[1], 2800, 40, 0.55, 0.4);
+  k.play('riser', A.cnt[0], { dur: A.cnt[1] - A.cnt[0], gain: 0.55 });
+  k.play('slam', A.lock, { gain: 1.0, pan: 0.3 }); k.play('boom', A.lock, { gain: 0.5 }); k.play('shimmer', A.lock + 0.02, { gain: 1.0 });
+  k.play('marker', A.ring, { dur: 0.35, gain: 0.7, pan: 0.4, soft: true });
+  k.play('pop', A.chip1 + 0.05, { f: 560, gain: 0.6, pan: -0.5 }); k.play('pop', A.chip2 + 0.05, { f: 480, gain: 0.5, pan: -0.5 });
+
+  // cut 1 (glitch) + autopilot
+  k.play('glitch', CUTS[1].t, { gain: 1 });
+  k.play('slam', U.big, { gain: 1.0 }); k.play('boom', U.big, { gain: 0.6 });
+  U.w.forEach((t, i) => k.play('slam', t, { gain: 0.55, pan: (i - 1) * 0.25 }));
+  U.w2.forEach((t, i) => k.play('slam', t, { gain: 0.6, pan: (i - 1) * 0.25 }));
+  k.play('pop', U.serif, { f: 520, gain: 0.55 }); k.play('marker', U.under, { dur: 0.22, gain: 0.8, soft: true });
+  k.play('pop', U.src, { f: 440, gain: 0.3, soft: true });
+  k.play('marker', U.ring, { dur: 0.35, gain: 0.6, soft: true });
+  k.play('pop', U.chip + 0.05, { f: 640, gain: 0.55 });
+
+  // cut 2 (vertical whip) + the experiment
+  k.play('whoosh', CUTS[2].t - 0.04, { dur: 0.34, gain: 1, dir: 1, top: 2600 });
+  T.w.forEach((t, i) => k.play('slam', t, { gain: 0.6, pan: -0.5 + i * 0.05 }));
+  k.play('whoosh', T.mock, { dur: 0.55, gain: 0.7, dir: -1, top: 2200 });
+  T.lines.forEach((t, i) => k.play('keys', t, { dur: 0.3, gain: 0.7, pan: 0.45 }));
+  k.play('pop', T.func, { f: 900, gain: 0.6, pan: 0.4 });
+  k.play('tapeStop', T.atk, { gain: 1 });
+  k.play('strike', T.atk, { gain: 0.9, pan: 0.3 }); k.play('stamp', T.atk + 0.02, { gain: 1.0, pan: 0.3 });
+  k.play('pop', T.tag, { f: 480, gain: 0.35, soft: true }); k.play('pop', T.src, { f: 420, gain: 0.3, soft: true });
+
+  // cut 3 (glitch) + 91.3%
+  k.play('glitch', CUTS[3].t, { gain: 1 });
+  k.play('pop', F2.up, { f: 520, gain: 0.4, soft: true });
+  ticks(funcShown, F2.cnt[0], F2.lock - 0.02, 2600, 8, 0.5, 0);
+  k.play('riser', F2.cnt[0], { dur: F2.cnt[1] - F2.cnt[0], gain: 0.7 });
+  k.play('slam', F2.lock, { gain: 1.0 }); k.play('shimmer', F2.lock + 0.03, { gain: 0.8 }); k.play('pop', F2.lock + 0.04, { f: 1000, gain: 0.4 });
+  F2.w.forEach((t, i) => k.play('slam', t, { gain: 0.5, pan: (i - 1.5) * 0.2 }));
+  k.play('pop', F2.sub, { f: 440, gain: 0.3, soft: true });
+
+  // cut 4 (flash) + 25.1%. near-silence, then the biggest hit
+  k.play('slam', CUTS[4].t + 0.06, { gain: 1 });
+  S.w.forEach((t, i) => k.play('slam', t, { gain: i === 2 ? 0.8 : 0.55, pan: (i - 1) * 0.25 }));
+  ticks(secShown, S.cnt[0], S.lock - 0.02, 2400, 18, 0.6, 0);
+  k.play('riser', S.cnt[0] + 0.1, { dur: S.cnt[1] - S.cnt[0] - 0.1, gain: 0.9 });
+  k.play('boom', S.lock, { gain: 1.35 }); k.play('slam', S.lock, { gain: 1.1 }); k.play('shimmer', S.lock + 0.03, { gain: 1.2 }); k.play('sparkle', S.lock + 0.08, { gain: 1 });
+  k.play('pop', S.best, { f: 560, gain: 0.5 }); k.play('pop', S.others, { f: 440, gain: 0.3, soft: true });
+
+  // cut 5 (whip left) + code
+  k.play('whoosh', CUTS[5].t - 0.04, { dur: 0.36, gain: 1, dir: -1 });
+  K.w.forEach((t, i) => k.play('slam', t, { gain: 0.65, pan: (i - 0.5) * 0.3 }));
+  k.play('pop', K.cardA + 0.05, { f: 600, gain: 0.7, pan: -0.4 }); k.play('pop', K.cardB + 0.05, { f: 760, gain: 0.7, pan: 0.4 });
+  k.play('pop', K.label, { f: 440, gain: 0.3, soft: true });
+  k.play('strike', K.strike, { gain: 0.9, pan: -0.4 });
+  k.play('marker', K.ring, { dur: 0.38, gain: 0.7, pan: 0.4, soft: true });
+  k.play('pop', K.line, { f: 520, gain: 0.4, soft: true }); k.play('marker', K.arrow, { dur: 0.25, gain: 0.55, pan: 0.5, soft: true });
+
+  // cut 6 (glitch) + takeaway
+  k.play('glitch', CUTS[6].t, { gain: 1 });
+  k.play('boom', V.ver, { gain: 1.2 }); k.play('slam', V.ver, { gain: 1 });
+  k.play('marker', V.hl, { dur: 0.26, gain: 1 });
+  V.w.forEach((t, i) => k.play('slam', t, { gain: 0.7 + i * 0.1, pan: (i - 1) * 0.2 }));
+  k.play('pop', V.line, { f: 520, gain: 0.4, soft: true }); k.play('shimmer', V.line + 0.05, { gain: 0.6 });
+  k.play('pop', V.src, { f: 420, gain: 0.25, soft: true });
+}
+----- END FILE: score.js -----

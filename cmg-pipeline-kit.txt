@@ -1,0 +1,130 @@
+CREATOR MOTION GRAPHICS - PIPELINE KIT (for unattended daily runs)
+=====================================================================
+Purpose: rebuild the "Creator Motion Graphics" kinetic-type video pipeline in a fresh cloud workspace.
+Files in this Drive folder (youtube-automation/_style-kit):
+  - cmg-prompt-and-reference.txt : the original 861-line style prompt + reference animation. LINE NUMBERS MATTER (build.py cuts it by line). Save it unchanged as WORK/prompt.txt.
+  - cmg-pipeline-kit.txt        : this file (scripts below; copy each block into the named file in WORK).
+  - cmg-example-story.txt       : a finished example of the three story modules (style.js, scenes.js, score.js) for a 39 s AI video. Read it for the level of detail expected. Do NOT reuse its story.
+
+SETUP (WORK = /home/claude/work, any empty dir)
+  mkdir -p WORK/story && cd WORK && npm init -y && npm i playwright @fontsource/anton @fontsource/instrument-serif @fontsource/inter
+  Chrome: use /usr/bin/google-chrome if present, else `which chromium`; else `npx playwright install chromium` and set env CHROME to its path. Run with --no-sandbox (harness does).
+  Google Fonts is blocked in the sandbox; harness.js injects the local @fontsource fonts and aborts the network ones (one harmless "ERR_FAILED" console line is expected).
+  ffmpeg must exist (`which ffmpeg`).
+
+BUILD
+  1. Write WORK/prompt.txt (unchanged copy of cmg-prompt-and-reference.txt).
+  2. Write WORK/story/meta.json  {"title":"...","meta":"topic · NN s","dur":NN,"aria":"..."}
+  3. Write WORK/story/style.js  (TL incl. D=duration, CUTS, PUNCH, SHAKE, FLASH, LEAK, value curves, redRoom etc.)
+  4. Write WORK/story/scenes.js (background(), camera(), chrome(), your scene functions, SCENES). Put DRAWYAW_PLACEHOLDER on its own line if you use drawYaw. The reference's helpers (word,row,slam,swipe,slamMarked,strike,scribble,handArrow,rr,wrap,drawYaw, CM, SFX, finishing, compositor, player) are included automatically by build.py; do not redefine them.
+  5. Write WORK/story/score.js  (scoreSound(k)); sound events read the same TL times as the picture.
+  6. python3 build.py WORK   -> WORK/animation.html
+  7. QA stills:  node stills.js WORK t1 t2 ... (one per beat, plus 0.4, each hook word, each cut midpoint, last 0.5 s)  -> WORK/qa/*.png ; make a contact sheet with ffmpeg tile if useful. LOOK AT EVERY STILL (Read tool). Fix: overlapping text, text off-frame, statement text < 80 px, labels < 28 px, key numbers < 120 px, anything factually wrong, empty frames.
+  8. node render.js WORK -> WORK/video.mp4 (30 fps, 1280x720, loudnorm -16). Check: ffprobe duration matches TL.D, has audio, file size < 100 MB, no page errors printed.
+  9. Look at 3-4 frames from the rendered MP4 (ffmpeg -ss) to confirm it matches the stills.
+
+HARD-WON RULES
+  - Every frame is a pure function of t; use CM.rng / CM.noise1, never Math.random.
+  - Headline rows must not collide with the top-left chrome label (label sits at y~54; keep headlines >= y 120 or make chrome fade before them).
+  - Long labels: shrink font or wrap; measure with c.measureText before placing; centre rows with row().
+  - Numbers/facts shown on screen must be verified from reliable sources; label illustrative figures as examples. Put sources in WORK/script.json.
+  - Mockups use invented generic names; no real logos, brands (except naming a study/product factually in text), or real people.
+  - 15-40 s total, hook in <2 s, something new every 0.5-1.5 s, takeaway holds ~1.5 s.
+  - Output is 16:9 landscape 1280x720 (a regular YouTube video, not a vertical Short).
+
+
+----- FILE: build.py -----
+# usage: python3 build.py WORKDIR
+# WORKDIR/prompt.txt  = cmg-prompt-and-reference.txt (the original 861-line attachment, line numbers matter)
+# WORKDIR/story/meta.json = {"title","meta","dur","aria"}
+# WORKDIR/story/style.js  = TL, CUTS, PUNCH, SHAKE, FLASH, LEAK, value curves (+ any extra consts)
+# WORKDIR/story/scenes.js = background, camera, chrome, your scene functions, SCENES (put DRAWYAW_PLACEHOLDER where drawYaw should go, or omit)
+# WORKDIR/story/score.js  = scoreSound(k)
+# writes WORKDIR/animation.html
+import json, sys, os
+W = sys.argv[1]
+L = open(os.path.join(W, 'prompt.txt')).read().split('\n')
+seg = lambda a, b: '\n'.join(L[a-1:b])
+rd = lambda p: open(os.path.join(W, 'story', p)).read()
+m = json.load(open(os.path.join(W, 'story', 'meta.json')))
+dur = m['dur']
+
+head = seg(56, 121)
+head = head.replace('<title>Creator Motion Graphics</title>', '<title>%s</title>' % m['title'])
+head = head.replace('Reference animation · 21.5 s · drawn in code, sound synthesized', '%s · %s s · drawn in code, sound synthesized' % (m['meta'], dur))
+head = head.replace('max="21.5"', 'max="%s"' % dur).replace('0.00 / 21.50', '0.00 / %.2f' % dur)
+head = head.replace('aria-label="Creator Motion Graphics reference animation"', 'aria-label="%s"' % m['aria'].replace('"', "'"))
+
+core = seg(122, 296)        # <script>, CM, SFX: verbatim
+consts = seg(304, 308)      # W, HH, destructure, colors, fonts
+helpers = seg(344, 402)     # word, measure, row, slam, swipe, slamMarked, strike, scribble, handArrow, rr, wrap
+yaw = seg(555, 572)         # drawYaw
+grain = seg(431, 446)       # grain tiles + finishing
+compositor = seg(699, 736)  # layers, sceneIndex, paintScene, explainer
+player = seg(818, 859)
+
+scenes = rd('scenes.js').replace('DRAWYAW_PLACEHOLDER', yaw)
+style = '\n'.join([consts, rd('style.js'), helpers, scenes, grain, compositor, rd('score.js'), player])
+open(os.path.join(W, 'animation.html'), 'w').write(head + '\n' + core + '\n' + style + '\n</script>\n')
+print('ok')
+----- END FILE: build.py -----
+
+----- FILE: harness.js -----
+// usage: node render.js WORKDIR   (needs WORKDIR/node_modules with playwright + @fontsource/{anton,instrument-serif,inter})
+const path = require('path');
+const WORK = path.resolve(process.argv[2] || '.');
+const { chromium } = require(path.join(WORK, 'node_modules/playwright'));
+const F = path.join(WORK, 'node_modules/@fontsource');
+const css = `
+@font-face{font-family:Anton;src:url(file://${F}/anton/files/anton-latin-400-normal.woff2);font-weight:400}
+@font-face{font-family:"Instrument Serif";src:url(file://${F}/instrument-serif/files/instrument-serif-latin-400-italic.woff2);font-style:italic;font-weight:400}
+@font-face{font-family:"Instrument Serif";src:url(file://${F}/instrument-serif/files/instrument-serif-latin-400-normal.woff2);font-style:normal;font-weight:400}
+${[400,500,600,700,800].map(w=>`@font-face{font-family:Inter;src:url(file://${F}/inter/files/inter-latin-${w}-normal.woff2);font-weight:${w}}`).join('\n')}`;
+exports.WORK = WORK;
+exports.open = async (file) => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', args: ['--no-sandbox', '--allow-file-access-from-files'] });
+  const page = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+  const errs = []; page.on('pageerror', e => errs.push('PAGEERR ' + e.message)); page.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()); });
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  await page.addInitScript(css => { document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); }); }, css);
+  await page.goto('file://' + file);
+  await page.waitForFunction(() => window.__ready === true, null, { timeout: 30000 });
+  return { browser, page, errs };
+};
+----- END FILE: harness.js -----
+
+----- FILE: render.js -----
+// usage: node render.js WORKDIR   -> WORKDIR/video.mp4 (1280x720, 30 fps, h264 + aac, loudnorm)
+const h = require('./harness.js'); const fs = require('fs'); const path = require('path'); const { spawn } = require('child_process');
+(async () => {
+  const W = h.WORK;
+  const { browser, page, errs } = await h.open(path.join(W, 'animation.html'));
+  const FPS = 30, D = await page.evaluate(() => window.DURATION), N = Math.round(D * FPS);
+  const a = await page.evaluate(async () => { const r = await SFX.render(window.scoreSound, window.DURATION, 48000, { voiceover: false }); const u8 = new Uint8Array(r.inter.buffer); let s = ''; const CH = 0x8000; for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return { b64: btoa(s), peak: r.peak, frames: r.frames }; });
+  fs.writeFileSync(path.join(W, 'audio.f32'), Buffer.from(a.b64, 'base64'));
+  console.log('audio peak', a.peak.toFixed(3));
+  const ff = spawn('ffmpeg', ['-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', 'pipe:0',
+    '-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', path.join(W, 'audio.f32'),
+    '-filter:a', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-t', String(D), '-movflags', '+faststart', path.join(W, 'video.mp4')], { stdio: ['pipe', 'inherit', 'inherit'] });
+  for (let i = 0; i < N; i++) {
+    const b64 = await page.evaluate((t) => { window.seek(t); return document.getElementById('stage').toDataURL('image/jpeg', 0.95).split(',')[1]; }, i / FPS);
+    if (!ff.stdin.write(Buffer.from(b64, 'base64'))) await new Promise(r => ff.stdin.once('drain', r));
+  }
+  ff.stdin.end(); await new Promise(r => ff.on('close', r));
+  console.log('done, page errors:', JSON.stringify(errs)); await browser.close();
+})();
+----- END FILE: render.js -----
+
+----- FILE: stills.js -----
+// usage: node stills.js WORKDIR t1 t2 t3 ...  -> WORKDIR/qa/still_<t>.png (look at every one; also a contact sheet via ffmpeg tile)
+const h = require('./harness.js'); const fs = require('fs'); const path = require('path');
+(async () => {
+  const W = h.WORK; fs.mkdirSync(path.join(W, 'qa'), { recursive: true });
+  const { browser, page, errs } = await h.open(path.join(W, 'animation.html'));
+  for (const t of process.argv.slice(3).map(Number)) {
+    const b64 = await page.evaluate((t) => { window.seek(t); return document.getElementById('stage').toDataURL('image/png').split(',')[1]; }, t);
+    fs.writeFileSync(path.join(W, 'qa', 'still_' + String(t).replace('.', '_') + '.png'), Buffer.from(b64, 'base64'));
+  }
+  console.log('errors', JSON.stringify(errs)); await browser.close();
+})();
+----- END FILE: stills.js -----
